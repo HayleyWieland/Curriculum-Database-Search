@@ -1,12 +1,11 @@
 import javax.swing.*;
-import javax.swing.event.ChangeListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.StringBufferInputStream;
+import java.sql.Statement;
 
 public class SelectStatementManager extends JFrame {
-    static String select = "SELECT song.title Title, concepts.concept_name Concept, lessons.grade_level Grade, category.category_title Category \n";
+    static String select = "SELECT song.title Title \n";
     static String from = " FROM song \n";
     static String join = " JOIN belongs_to ON song.song_code = belongs_to.song_code \n" +
             " JOIN category ON belongs_to.category_code = category.category_code \n" +
@@ -16,11 +15,12 @@ public class SelectStatementManager extends JFrame {
             " JOIN meets ON lessons.lesson_plan_id = meets.lesson_plan_id \n" +
             " JOIN standards ON meets.standard_key = standards.standard_key \n";
     static String where = " ";
-    static String groupBy = " GROUP BY song.title;";
+    static String where2 = "";
+    static String groupBy = " GROUP BY song.title";
+    static String fullSelectStatement = "";
     JComboBox categoryList;
     JComboBox conceptsList;
     JComboBox districtStndrdsList;
-
     JComboBox nationalStandardsList;
 
     //menu constructor
@@ -41,7 +41,7 @@ public class SelectStatementManager extends JFrame {
         topPanel.setLayout(topLayout);
 
         //create the category menu
-        JLabel categoryLabel = new JLabel("Choose a category: ");
+        JLabel categoryLabel = new JLabel("Category: ");
         String [] categories = new String[] {"", "Halloween", "First Day", "Game", "Vocal Exploration", "Song Fragments", "Simple Songs",
         "Vocal Improvisation", "Movement Exploration", "Songs for Form & Expression", "Steady Beat Songs & Chants", "Recorded Steady Beat Music",
         "Song Story", "Fall", "Winter", "Play Party", "Black History Month", "Hispanic Heritage Month", "Four Voices"};
@@ -52,7 +52,7 @@ public class SelectStatementManager extends JFrame {
         topPanel.add(categoryList);
 
         //create the concepts menu
-        JLabel conceptsLabel = new JLabel("Choose a concept: ");
+        JLabel conceptsLabel = new JLabel("Concept: ");
         String [] concepts = new String[]{"", "Four Voices", "Finding Head Voice", "Improvising on a Neutral Syllable", "Improvising with Known Words",
         "Improvising Words and Melody", "Teacher Led Steady Beat", "Student Led Steady Beat", "Steady Beat in Groups of 2",
         "Steady Beat in Groups of 3", "Experiencing Form & Expression Through Movement", "Pitch echoing", "Solo singing",
@@ -65,10 +65,11 @@ public class SelectStatementManager extends JFrame {
         topPanel.add(conceptsLabel);
         topPanel.add(conceptsList);
 
-        //create the standards label
-        JLabel standards = new JLabel("STANDARDS");
+        //set the layout for the middle panel
+        middlePanel.setLayout(new BoxLayout(middlePanel, BoxLayout.PAGE_AXIS));
+
         //create the district standards label and list
-        JLabel district = new JLabel("District");
+        JLabel district = new JLabel("District Standards:");
         String [] districtStandards = new String[]{"", "RH1 - Students will be able to identify what does and does not have a beat.", "RH2 - Students will be able to demonstrate a steady beat by moving and performing body percussion.",
         "RH3 - Students will be able to perform 4-beat rhythms with quarter, 2-eighths, quarter rest to a steady beat.", "PI1 - Students will be able to express high and low sounds in song and through vocal exploration, including the pitches sol and mi.",
         "PI2 - Students will be able to differentiate high and low sounds through movement.", "PI3 - Students will be able to differentiate melodies moving up and down through movement.",
@@ -87,13 +88,12 @@ public class SelectStatementManager extends JFrame {
         districtStndrdsList = new JComboBox(districtStandards);
 
         //add the districtStndrdsList to the middle panel
-        middlePanel.add(standards);
         middlePanel.add(district);
         middlePanel.add(districtStndrdsList);
 
 
         //create the district standards label and list
-        JLabel national = new JLabel("National");
+        JLabel national = new JLabel("National Standards:");
         String [] nationalStandards = new String[]{"", "MU:Cr1.1.Ka - With guidance, explore and experience music concepts (such as beat and melodic contour).", "MU:Cr1.1.Kb - With guidance, generate musical ideas (such as movements or motives).",
         "MU:Cr2.1.Ka - With guidance, demonstrate and choose favorite musical ideas.", "MU:Cr2.1.Ka - With guidance, organize personal musical ideas using iconic notation and/or recording technology.",
         "MU:Cr3.1.Ka - With guidance, apply personal, peer, and teacher feedback in refining personal musical ideas.", "MU:Cr3.2.Ka - With guidance, demonstrate a final version of personal musical ideas to peers.",
@@ -104,6 +104,7 @@ public class SelectStatementManager extends JFrame {
         "MU:Re8.1.Ka - With guidance, demonstrate awareness of expressive qualities (such as dynamics and tempo) that reflect creators’/performers’ expressive intent.", "MU:Re9.1.Ka - With guidance, apply personal and expressive preferences in the evaluation of music.",
         "MU:Cn10.0.Ka - Demonstrate how interests, knowledge, and skills relate to personal choices and intent when creating, performing, and responding to music", "MU:Cn11.0.Ka - Demonstrate understanding of relationships between music and the other arts, other disciplines, varied contexts, and daily life."};
         nationalStandardsList = new JComboBox(nationalStandards);
+
 
         //add the label and the combo box to the middle panel
         middlePanel.add(national);
@@ -133,9 +134,10 @@ public class SelectStatementManager extends JFrame {
         mainFrame.add(middlePanel, mainLayout.CENTER);
         mainFrame.add(bottomPanel, mainLayout.SOUTH);
 
+        //set the frame size
+        mainFrame.setBounds(0,0, 1180, 200);
         //activate the frame
         mainFrame.setVisible(true);
-
     }
 
     class submitListener implements ActionListener{
@@ -148,15 +150,23 @@ public class SelectStatementManager extends JFrame {
             //get the selected item from the district standards ComboBox
             getDistrictStandard();
             //get the selected item from the national standards ComboBox
-            getNationalStandard();
-
+            int districtStandardIndex = districtStndrdsList.getSelectedIndex();
+            int getNationalStandardIndex = nationalStandardsList.getSelectedIndex();
+            if(districtStandardIndex != 0 && getNationalStandardIndex != 0){
+                getNationalStandardIntersect();
+                fullSelectStatement = select + from + join + where + "\n"+ groupBy + " \n INTERSECT \n" +
+                        select + from + join + where2 + "\n" + groupBy + ";";
+            }else{
+                getNationalStandardAlone();
+                fullSelectStatement = select + from + join + where + "\n"+ groupBy + ";";
+            }
             //print the select statement
-            System.out.println(select + from + join + where + "\n"+ groupBy);
+            //System.out.println(fullSelectStatement);
+            new DatabaseConnector(fullSelectStatement);
             //reset the drop boxes to allow for a new query
             reset();
         }
     }
-
     public void getCategory(){
         String category = (String)categoryList.getSelectedItem();
         if(category.equalsIgnoreCase("")){
@@ -557,8 +567,49 @@ public class SelectStatementManager extends JFrame {
             }
         }
     }
-
-    public void getNationalStandard(){
+    public void getNationalStandardIntersect(){
+        int nationalStandardIndex = nationalStandardsList.getSelectedIndex();
+        if(nationalStandardIndex == 1){
+                where2 = " WHERE standards.standard_key = 1";
+        }else if(nationalStandardIndex == 2){
+                where2 = " WHERE standards.standard_key = 2";
+        }else if(nationalStandardIndex == 3){
+                where2 = " WHERE standards.standard_key = 3";
+        }else if(nationalStandardIndex == 4){
+                where2 = " WHERE standards.standard_key = 4";
+        }else if(nationalStandardIndex == 5){
+                where2 = " WHERE standards.standard_key = 5";
+        }else if(nationalStandardIndex == 6){
+                where2 = " WHERE standards.standard_key = 6";
+        }else if(nationalStandardIndex == 7){
+                where2 = " WHERE standards.standard_key = 7";
+        }else if(nationalStandardIndex == 8){
+                where2 = " WHERE standards.standard_key = 8";
+        }else if(nationalStandardIndex == 9){
+                where2 = " WHERE standards.standard_key = 9";
+        }else if(nationalStandardIndex == 10){
+                where2 = " WHERE standards.standard_key = 10";
+        }else if(nationalStandardIndex == 11){
+                where2 = " WHERE standards.standard_key = 11";
+        }else if(nationalStandardIndex == 12){
+                where2 = " WHERE standards.standard_key = 12";
+        }else if(nationalStandardIndex == 13){
+                where2 = " WHERE standards.standard_key = 13";
+        }else if(nationalStandardIndex == 14){
+                where2 = " WHERE standards.standard_key = 14";
+        }else if(nationalStandardIndex == 15){
+                where2 = " WHERE standards.standard_key = 15";
+        }else if(nationalStandardIndex == 16){
+                where2 = " WHERE standards.standard_key = 16";
+        }else if(nationalStandardIndex == 17){
+                where2 = " WHERE standards.standard_key = 17";
+        }else if(nationalStandardIndex == 18){
+                where2 = " WHERE standards.standard_key = 18";
+        }else if(nationalStandardIndex == 19){
+                where2 = " WHERE standards.standard_key = 19";
+        }
+    }
+    public void getNationalStandardAlone(){
         int nationalStandardIndex = nationalStandardsList.getSelectedIndex();
         if(nationalStandardIndex == 1){
             if(where.contains("W")){
@@ -682,7 +733,6 @@ public class SelectStatementManager extends JFrame {
             reset();
         }
     }
-
     public void reset(){
         categoryList.setSelectedIndex(0);
         conceptsList.setSelectedIndex(0);
